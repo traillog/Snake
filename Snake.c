@@ -143,7 +143,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
     HDC hdc;
     PAINTSTRUCT ps;
     static int  cxClient, cyClient;
-    static int i, j;
+    static int i;
     static int currentDir = 0;
     static BOOL collision = FALSE;
     static BOOL pauseOn = FALSE;
