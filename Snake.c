@@ -20,7 +20,7 @@
 #define     BRD_SIZE_SQ     20      // Board size in squares (logical units)
 
 // Snake config
-#define     SNAKE_SIZE      8       // Total amount of links
+#define     SNAKE_SIZE      6       // Total amount of links
 #define     SNAKE_HEAD      ( SNAKE_SIZE - 1 )
 #define     SNAKE_TAIL      0
 
@@ -29,8 +29,13 @@ LRESULT CALLBACK WndProc( HWND hwnd, UINT message,
     WPARAM wParam, LPARAM lParam );
 
 // Auxiliary functions
-void initLevel( HWND hwnd, int *currentDirPt, BOOL *collisionPt,
-    BOOL *pauseOnPt, POINT *snkBdy, char ( *brd )[ BRD_SIZE_SQ ] );
+void initLevel( HWND hwnd,
+    int *currentDirPt,
+    BOOL *collisionPt, BOOL *pauseOnPt,
+    POINT *snkBdy,
+    char ( *brd )[ BRD_SIZE_SQ ],
+    char ( *walls )[ BRD_SIZE_SQ ] );
+
 void moveSnake( HWND hwnd,
     int cX, int cY,
     int *currentDirPt, BOOL *collisionPt,
@@ -38,14 +43,23 @@ void moveSnake( HWND hwnd,
     HPEN tailPen, HBRUSH tailBrush,
     HPEN headPenCol, HBRUSH headBrushCol,
     HPEN headPenNoCol, HBRUSH headBrushNoCol );
+
 void setUpMappingMode( HDC hdc, int cX, int cY );
+
 void drawGrid( HDC hdc );
+
+void drawLevel( HDC hdc, char ( *brd )[ BRD_SIZE_SQ ] );
+
 void drawHead( HDC hdc, POINT *snkBdy, BOOL *collisionPt,
     HPEN headPenCol, HBRUSH headBrushCol,
     HPEN headPenNoCol, HBRUSH headBrushNoCol );
+
 void drawNeck( HDC hdc, POINT *snkBdy );
+
 void drawBody( HDC hdc, POINT *snkBdy );
+
 void drawTail( HDC hdc, POINT *snkBdy, HPEN tailPen, HBRUSH tailBrush );
+
 void deleteTail( HDC hdc, POINT *snkBdy, POINT *oldTailPos );
 
 int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
@@ -142,16 +156,48 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     HDC hdc;
     PAINTSTRUCT ps;
-    static int  cxClient, cyClient;
     static int i;
+    static int  cxClient, cyClient;
+    
+    // Snake status
     static int currentDir = 0;
     static BOOL collision = FALSE;
     static BOOL pauseOn = FALSE;
+    
+    // Colors
     static HPEN redPen, greenPen, brownPen;
     static HBRUSH redBrush, greenBrush, brownBrush;
 
+    // Snake's body
     static POINT snakeBdy[ SNAKE_SIZE ] = { 0 };
+    
+    // Board
     static char board[ BRD_SIZE_SQ ][ BRD_SIZE_SQ ] = { 0 };
+
+    // Definition level 1
+    static char level01[ BRD_SIZE_SQ ][ BRD_SIZE_SQ ] =
+    {
+        { 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 },
+        { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 },
+        { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 },
+        { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 },
+        { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 },
+        { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 },
+        { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 },
+        { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 },
+        { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 },
+        { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+        { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 },
+        { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 },
+        { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 },
+        { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 },
+        { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 },
+        { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 },
+        { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 },
+        { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 },
+        { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 },
+        { 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 }
+    };
 
     switch( message )
     {
@@ -166,8 +212,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
         redPen   = CreatePen( PS_SOLID, 0, RGB( 0xFF, 0x00, 0x00 ) );
         greenPen = CreatePen( PS_SOLID, 0, RGB( 0x55, 0xD4, 0x00 ) );
 
-        // Init level
-        initLevel( hwnd, &currentDir, &collision, &pauseOn, snakeBdy, board );
+        // Init level status
+        initLevel( hwnd,
+            &currentDir, &collision, &pauseOn,
+            snakeBdy, board, level01 );
         return 0;
 
     case WM_SIZE :
@@ -178,7 +226,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 
     case WM_TIMER :
         // Move snake one square in current dir
-        moveSnake( hwnd, cxClient, cyClient,
+        moveSnake( hwnd,
+            cxClient, cyClient,
             &currentDir, &collision,
             snakeBdy, board,
             brownPen, brownBrush,
@@ -235,9 +284,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
             return 0;
 
         case 0x4E :           // Virtual key code for 'N'
-            // Reset level
-            initLevel( hwnd, &currentDir,
-                &collision, &pauseOn, snakeBdy, board );
+            // Reset level status
+            initLevel( hwnd,
+                &currentDir, &collision, &pauseOn,
+                snakeBdy, board, level01 );
             return 0;
 
         case VK_ESCAPE :
@@ -257,7 +307,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
             currentDir += 4;
 
         // Move snake one square in current dir
-        moveSnake( hwnd, cxClient, cyClient,
+        moveSnake( hwnd,
+            cxClient, cyClient,
             &currentDir, &collision,
             snakeBdy, board,
             brownPen, brownBrush,
@@ -277,12 +328,14 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 
         drawGrid( hdc );
 
-        drawHead( hdc, snakeBdy, &collision,
-            redPen, redBrush, greenPen, greenBrush );
+        drawLevel( hdc, board );
 
         drawBody( hdc, snakeBdy );
 
         drawTail( hdc, snakeBdy, brownPen, brownBrush );
+
+        drawHead( hdc, snakeBdy, &collision,
+            redPen, redBrush, greenPen, greenBrush );
 
         EndPaint( hwnd, &ps );
 
@@ -324,6 +377,45 @@ void setUpMappingMode( HDC hdc, int cX, int cY )
         cX / 2 - ( BRD_SIZE_PX / 2 ),
         cY / 2 - ( BRD_SIZE_PX / 2 ),
         NULL );
+}
+
+void initLevel( HWND hwnd,
+    int *currentDirPt,
+    BOOL *collisionPt, BOOL *pauseOnPt,
+    POINT *snkBdy,
+    char ( *brd )[ BRD_SIZE_SQ ],
+    char ( *walls )[ BRD_SIZE_SQ ] )
+{
+    int i;
+
+    // Stop move-timer
+    KillTimer( hwnd, ID_TIMER );
+
+    // Set dir to UP
+    *currentDirPt = UP;
+
+    // Reset flags
+    *collisionPt = FALSE;
+    *pauseOnPt = FALSE;
+
+    // Load level obstacles
+    memcpy( brd, walls, BRD_SIZE_SQ * BRD_SIZE_SQ * sizeof( char ) );
+
+    // Reset snake's position
+    for ( i = SNAKE_TAIL; i < SNAKE_SIZE; i++ )
+    {
+        snkBdy[ i ].x = BRD_SIZE_SQ / 2 - 1;
+        snkBdy[ i ].y = BRD_SIZE_SQ - 2 - i;
+
+        // Block current sanke position on board
+        brd[ snkBdy[ i ].y ][ snkBdy[ i ].x ] = 2;
+    }
+
+    // Re-start move-timer
+    SetTimer( hwnd, ID_TIMER, DELAY_TIMER, NULL );
+
+    // Trigger a re-paint
+    InvalidateRect( hwnd, NULL, TRUE );
 }
 
 void moveSnake( HWND hwnd,
@@ -398,7 +490,7 @@ void moveSnake( HWND hwnd,
 
     // Block new head pos on board
     if ( !( *collisionPt ) )
-        brd[ snkBdy[ SNAKE_HEAD ].y ][ snkBdy[ SNAKE_HEAD ].x ] = 1;
+        brd[ snkBdy[ SNAKE_HEAD ].y ][ snkBdy[ SNAKE_HEAD ].x ] = 2;
 
     //==================================================
     // Update snake's plot
@@ -409,49 +501,14 @@ void moveSnake( HWND hwnd,
 
     deleteTail( hdc, snkBdy, &oldTail );
 
-    drawHead( hdc, snkBdy, collisionPt,
-        headPenCol, headBrushCol, headPenNoCol, headBrushNoCol );
-
     drawNeck( hdc, snkBdy );
 
     drawTail( hdc, snkBdy, tailPen, tailBrush );
 
+    drawHead( hdc, snkBdy, collisionPt,
+        headPenCol, headBrushCol, headPenNoCol, headBrushNoCol );
+
     ReleaseDC( hwnd, hdc );
-}
-
-void initLevel( HWND hwnd, int *currentDirPt, BOOL *collisionPt,
-    BOOL *pauseOnPt, POINT *snkBdy, char ( *brd )[ BRD_SIZE_SQ ] )
-{
-    int i;
-
-    // Stop move-timer
-    KillTimer( hwnd, ID_TIMER );
-
-    // Set dir to UP
-    *currentDirPt = UP;
-
-    // Reset flags
-    *collisionPt = FALSE;
-    *pauseOnPt = FALSE;
-
-    // Unblock board
-    memset( brd, 0, BRD_SIZE_SQ * BRD_SIZE_SQ * sizeof( char ) );
-
-    // Reset snake's position
-    for ( i = SNAKE_TAIL; i < SNAKE_SIZE; i++ )
-    {
-        snkBdy[ i ].x = BRD_SIZE_SQ / 2 - 1;
-        snkBdy[ i ].y = BRD_SIZE_SQ - 1 - i;
-
-        // Block current sanke position on board
-        brd[ snkBdy[ i ].y ][ snkBdy[ i ].x ] = 1;
-    }
-
-    // Re-start move-timer
-    SetTimer( hwnd, ID_TIMER, DELAY_TIMER, NULL );
-
-    // Trigger a re-paint
-    InvalidateRect( hwnd, NULL, TRUE );
 }
 
 void drawGrid( HDC hdc )
@@ -469,6 +526,24 @@ void drawGrid( HDC hdc )
         MoveToEx( hdc, 0, i, NULL );
         LineTo( hdc, BRD_SIZE_SQ, i );
     }
+}
+
+void drawLevel( HDC hdc, char ( *brd )[ BRD_SIZE_SQ ] )
+{
+    int i, j;
+
+    SelectObject( hdc, GetStockObject( BLACK_PEN ) );
+    SelectObject( hdc, GetStockObject( BLACK_BRUSH ) );
+
+    for ( i = 0; i < BRD_SIZE_SQ; i++ )
+    {
+        for ( j = 0; j < BRD_SIZE_SQ; j++ )
+        {
+            if ( brd[ i ][ j ] == 1 )
+                Rectangle( hdc, j, i, j + 1, i + 1 );
+        }
+    }
+
 }
 
 void drawHead( HDC hdc, POINT *snkBdy, BOOL *collisionPt,
