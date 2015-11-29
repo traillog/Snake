@@ -22,8 +22,9 @@
 #define     BRD_SIZE_SQ     20      // Board size in squares (logical units)
 
 // Snake config
+#define     GROWTH_INC          4   // New links added per apple
 #define     SNAKE_INI_SIZE      5   // Initial length (links)
-#define     SNAKE_MAX_SIZE      20  // Max length (links)
+#define     SNAKE_MAX_SIZE      25  // Max length (links)
 #define     SNAKE_TAIL          0                       // Tail's index
 #define     SNAKE_INI_HEAD  ( SNAKE_INI_SIZE - 1 )      // Ini heads's index
 
@@ -47,7 +48,8 @@ void initLevel( HWND hwnd,
 
 void moveSnake( HWND hwnd,
     int cX, int cY,
-    int *currentDirPt, BOOL *collisionPt,
+    int *currentDirPt,
+    BOOL *growingPt, BOOL *collisionPt,
     POINT *aplPos, BOOL *aplOnBrd,
     POINT *snkBdy, int *snkHead,
     char ( *brd )[ BRD_SIZE_SQ ],
@@ -261,7 +263,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
         // Move snake one square in current dir
         moveSnake( hwnd,
             cxClient, cyClient,
-            &currentDir, &collision,
+            &currentDir,
+            &growing, &collision,
             &applePos, &appleOnBoard,
             snakeBdy, &snakeHead, board,
             brownPen, brownBrush,
@@ -347,7 +350,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
         // Move snake one square in current dir
         moveSnake( hwnd,
             cxClient, cyClient,
-            &currentDir, &collision,
+            &currentDir,
+            &growing, &collision,
             &applePos, &appleOnBoard,
             snakeBdy, &snakeHead, board,
             brownPen, brownBrush,
@@ -475,7 +479,8 @@ void initLevel( HWND hwnd,
 
 void moveSnake( HWND hwnd,
     int cX, int cY,
-    int *currentDirPt, BOOL *collisionPt,
+    int *currentDirPt,
+    BOOL *growingPt, BOOL *collisionPt,
     POINT *aplPos, BOOL *aplOnBrd,
     POINT *snkBdy, int *snkHead,
     char ( *brd )[ BRD_SIZE_SQ ],
@@ -485,40 +490,36 @@ void moveSnake( HWND hwnd,
     HPEN aplPen, HBRUSH aplBrush )
 {
     static HDC hdc;
+    static unsigned int oldHead;
+    static POINT newHeadPos;
     static POINT oldTail;
-
-    //==================================================
-    // Move snake's body ---> only if no apple was eaten
-    //==================================================
-    // Save original tail's pos
-    oldTail = snkBdy[ SNAKE_TAIL ];
-
-    // Shift position of all links towards the tail,
-    // tail's original pos is overwritten
-    memmove( snkBdy, snkBdy + 1, ( *snkHead ) * sizeof( POINT ) );
-
-    // Free tail's original pos on board
-    brd[ oldTail.y ][ oldTail.x ] = 0;
+    static int linksToGrowth = 0;
 
     //==================================================
     // Update head's position
     //==================================================
+    // Save original head's pos
+    oldHead = *snkHead;
+
+    // Init new head pos
+    newHeadPos = snkBdy[ *snkHead ];
+
     switch( *currentDirPt )
     {
     case UP :
-        snkBdy[ *snkHead ].y--;
+        newHeadPos.y--;
         break;
 
     case DOWN :
-        snkBdy[ *snkHead ].y++;
+        newHeadPos.y++;
         break;
 
     case RIGHT :
-        snkBdy[ *snkHead ].x++;
+        newHeadPos.x++;
         break;
 
     case LEFT :
-        snkBdy[ *snkHead ].x--;
+        newHeadPos.x--;
         break;
 
     default :
@@ -526,48 +527,91 @@ void moveSnake( HWND hwnd,
     }
 
     // Validate new head's pos
-    if ( snkBdy[ *snkHead ].x > ( BRD_SIZE_SQ - 1 ) )
-        snkBdy[ *snkHead ].x %= BRD_SIZE_SQ;
+    if ( newHeadPos.x > ( BRD_SIZE_SQ - 1 ) )
+        newHeadPos.x %= BRD_SIZE_SQ;
 
-    if ( snkBdy[ *snkHead ].x < 0 )
-        snkBdy[ *snkHead ].x += BRD_SIZE_SQ;
+    if ( newHeadPos.x < 0 )
+        newHeadPos.x += BRD_SIZE_SQ;
 
-    if ( snkBdy[ *snkHead ].y > ( BRD_SIZE_SQ - 1 ) )
-        snkBdy[ *snkHead ].y %= BRD_SIZE_SQ;
+    if ( newHeadPos.y > ( BRD_SIZE_SQ - 1 ) )
+        newHeadPos.y %= BRD_SIZE_SQ;
 
-    if ( snkBdy[ *snkHead ].y < 0 )
-        snkBdy[ *snkHead ].y += BRD_SIZE_SQ;
+    if ( newHeadPos.y < 0 )
+        newHeadPos.y += BRD_SIZE_SQ;
 
     //==================================================
     // Detect collisions
     //==================================================
     // Walls == 1
     // Body  == 2
-    if ( brd[ snkBdy[ *snkHead ].y ][ snkBdy[ *snkHead ].x ] )
+    if ( brd[ newHeadPos.y ][ newHeadPos.x ] )
         *collisionPt = TRUE;
     else
         *collisionPt = FALSE;
 
     // Block new head pos on board
     if ( !( *collisionPt ) )
-        brd[ snkBdy[ *snkHead ].y ][ snkBdy[ *snkHead ].x ] = BODY;
+        brd[ newHeadPos.y ][ newHeadPos.x ] = BODY;
 
     // Check for apple at new head pos
-    if ( *aplOnBrd &&
-        ( snkBdy[ *snkHead ].x == aplPos->x ) &&
-        ( snkBdy[ *snkHead ].y == aplPos->y ) )
+    if ( ( *aplOnBrd ) &&
+         ( newHeadPos.x == aplPos->x ) &&
+         ( newHeadPos.y == aplPos->y ) )
     {
-        // Snake's body does not change position
+        // Apple founded
 
+        // Snake has eaten an apple --> it starts to grow
+        *growingPt = TRUE;
 
-        // Extend snake's body one link     !!!!!!!!!!
+        // Inc links to growth, if max length not reached
+        linksToGrowth += GROWTH_INC;
 
+        // Current apple has been eaten and no max length reached
+        if ( *snkHead + linksToGrowth < SNAKE_MAX_SIZE - 1 )
+            *aplOnBrd = putAppleOnBrd( aplPos, brd );
+        else
+            *aplOnBrd = FALSE;
+    }
+    else
+    {
+        // No apple founded
 
-        // Old head turns into neck-link
+        // If max length reached --> stop growing
+        if ( *snkHead >= SNAKE_MAX_SIZE - 1 )
+            linksToGrowth = 0;
 
+        // Check for growth status
+        if ( linksToGrowth == 0 ) 
+            *growingPt = FALSE;         // Growth finished
+    }
 
-        // Current apple has been eaten --> Create a new apple
-        *aplOnBrd = putAppleOnBrd( aplPos, brd );
+    //==================================================
+    // Move snake's body ---> only if no apple was eaten
+    //==================================================
+    if ( !( *growingPt ) )
+    {
+        oldTail = snkBdy[ SNAKE_TAIL ];
+
+        // Free tail's original pos on board
+        brd[ oldTail.y ][ oldTail.x ] = 0;
+
+        // Shift position of all links towards the tail
+        // Tail's original pos is overwritten
+        memmove( snkBdy, snkBdy + 1, oldHead * sizeof( POINT ) );
+
+        // Save new head pos to snake's head
+        snkBdy[ *snkHead ] = newHeadPos;
+    }
+    else
+    {
+        // Increment snake's length
+        ( *snkHead )++;
+
+        // Save new head pos to snake's head
+        snkBdy[ *snkHead ] = newHeadPos;
+
+        // Dec links to growth
+        linksToGrowth--;
     }
 
     //==================================================
