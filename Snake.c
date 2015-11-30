@@ -22,12 +22,11 @@
 #define     BRD_SIZE_SQ     20      // Board size in squares (logical units)
 
 // Snake config
-#define     GROWTH_INC          4   // New links added per apple
+#define     GROWTH_INC          4   // Amount new links added per apple
 #define     SNAKE_INI_SIZE      5   // Initial length (links)
 #define     SNAKE_MAX_SIZE      25  // Max length (links)
 #define     SNAKE_TAIL          0                       // Tail's index
 #define     SNAKE_INI_HEAD  ( SNAKE_INI_SIZE - 1 )      // Ini heads's index
-
 
 // Type of obstacles
 #define     WALL            1
@@ -56,13 +55,14 @@ void moveSnake( HWND hwnd,
     HPEN tailPen, HBRUSH tailBrush,
     HPEN headPenCol, HBRUSH headBrushCol,
     HPEN headPenNoCol, HBRUSH headBrushNoCol,
-    HPEN aplPen, HBRUSH aplBrush );
+    HPEN aplPen, HBRUSH aplBrush,
+    HPEN gridPen, HBRUSH gridBrush );
 
 BOOL putAppleOnBrd( POINT *aplPos, char ( *brd )[ BRD_SIZE_SQ ] );
 
 void setUpMappingMode( HDC hdc, int cX, int cY );
 
-void drawGrid( HDC hdc );
+void drawGrid( HDC hdc, HPEN gridPen, HBRUSH gridBrush );
 
 void drawLevel( HDC hdc, char ( *brd )[ BRD_SIZE_SQ ] );
 
@@ -78,7 +78,8 @@ void drawBody( HDC hdc, POINT *snkBdy, int *snkHead );
 
 void drawTail( HDC hdc, POINT *snkBdy, HPEN tailPen, HBRUSH tailBrush );
 
-void deleteTail( HDC hdc, POINT *snkBdy, POINT *oldTailPos );
+void deleteTail( HDC hdc, POINT *snkBdy, POINT *oldTailPos,
+    HPEN gridPen, HBRUSH gridBrush );
 
 void drawApple( HDC hdc, POINT *aplPos, HPEN aplPen, HBRUSH aplBrush );
 
@@ -185,18 +186,18 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
     static int snakeHead = SNAKE_INI_HEAD;
 
     // Snake's status
-    static int currentDir = UP;
-    static BOOL growing = FALSE;
-    static BOOL collision = FALSE;
-    static BOOL pauseOn = FALSE;
+    static int currentDir   = UP;
+    static BOOL growing     = FALSE;
+    static BOOL collision   = FALSE;
+    static BOOL pauseOn     = FALSE;
 
     // Apples
     static BOOL appleOnBoard = FALSE;
     static POINT applePos;
     
     // Colors
-    static HPEN redPen, greenPen, brownPen, purplePen;
-    static HBRUSH redBrush, greenBrush, brownBrush, purpleBrush;
+    static HPEN redPen, greenPen, brownPen, purplePen, lightGreyPen;
+    static HBRUSH redBrush, greenBrush, brownBrush, purpleBrush, lightGreyBrush;
     
     // Board
     static char board[ BRD_SIZE_SQ ][ BRD_SIZE_SQ ] = { 0 };
@@ -233,16 +234,18 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
         srand( ( unsigned int )time( NULL ) );
 
         // Init pens
-        brownPen = CreatePen( PS_SOLID, 0, RGB( 0xA0, 0x5A, 0x2C ) );
-        redPen   = CreatePen( PS_SOLID, 0, RGB( 0xFF, 0x00, 0x00 ) );
-        greenPen = CreatePen( PS_SOLID, 0, RGB( 0x55, 0xD4, 0x00 ) );
-        purplePen = CreatePen( PS_SOLID, 0, RGB( 0xD4, 0x2A, 0xFF ) );
+        brownPen     = CreatePen( PS_SOLID, 0, RGB( 0xA0, 0x5A, 0x2C ) );
+        redPen       = CreatePen( PS_SOLID, 0, RGB( 0xFF, 0x00, 0x00 ) );
+        greenPen     = CreatePen( PS_SOLID, 0, RGB( 0x55, 0xD4, 0x00 ) );
+        purplePen    = CreatePen( PS_SOLID, 0, RGB( 0xD4, 0x2A, 0xFF ) );
+        lightGreyPen = CreatePen( PS_SOLID, 0, RGB( 0x00, 0x00, 0x00 ) );
         
         // Init brushes
-        brownBrush = CreateSolidBrush( RGB( 0xA0, 0x5A, 0x2C ) );
-        redBrush   = CreateSolidBrush( RGB( 0xFF, 0x00, 0x00 ) );
-        greenBrush = CreateSolidBrush( RGB( 0x55, 0xD4, 0x00 ) );
-        purpleBrush = CreateSolidBrush( RGB( 0xD4, 0x2A, 0xFF ) );
+        brownBrush     = CreateSolidBrush( RGB( 0xA0, 0x5A, 0x2C ) );
+        redBrush       = CreateSolidBrush( RGB( 0xFF, 0x00, 0x00 ) );
+        greenBrush     = CreateSolidBrush( RGB( 0x55, 0xD4, 0x00 ) );
+        purpleBrush    = CreateSolidBrush( RGB( 0xD4, 0x2A, 0xFF ) );
+        lightGreyBrush = CreateSolidBrush( RGB( 0x00, 0x00, 0x00 ) );
 
         // Init level status
         initLevel( hwnd,
@@ -270,7 +273,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
             brownPen, brownBrush,
             redPen, redBrush,
             greenPen, greenBrush,
-            purplePen, purpleBrush );
+            purplePen, purpleBrush,
+            lightGreyPen, lightGreyBrush );
 
         // Stop timer if in collision state
         if ( collision )
@@ -357,7 +361,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
             brownPen, brownBrush,
             redPen, redBrush,
             greenPen, greenBrush,
-            purplePen, purpleBrush );
+            purplePen, purpleBrush,
+            lightGreyPen, lightGreyBrush );
 
         // Re-start move-timer, if not in collision state
         if ( !collision )
@@ -370,7 +375,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 
         setUpMappingMode( hdc, cxClient, cyClient );
 
-        drawGrid( hdc );
+        drawGrid( hdc, lightGreyPen, lightGreyBrush );
 
         drawLevel( hdc, board );
 
@@ -397,12 +402,14 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
         DeleteObject( greenPen );
         DeleteObject( brownPen );
         DeleteObject( purplePen );
+        DeleteObject( lightGreyPen );
 
         // Delete brushes
         DeleteObject( redBrush );
         DeleteObject( greenBrush );
         DeleteObject( brownBrush );
         DeleteObject( purpleBrush );
+        DeleteObject( lightGreyBrush );
 
         // Quit application
         PostQuitMessage( 0 );
@@ -487,7 +494,8 @@ void moveSnake( HWND hwnd,
     HPEN tailPen, HBRUSH tailBrush,
     HPEN headPenCol, HBRUSH headBrushCol,
     HPEN headPenNoCol, HBRUSH headBrushNoCol,
-    HPEN aplPen, HBRUSH aplBrush )
+    HPEN aplPen, HBRUSH aplBrush,
+    HPEN gridPen, HBRUSH gridBrush )
 {
     static HDC hdc;
     static unsigned int oldHead;
@@ -621,11 +629,11 @@ void moveSnake( HWND hwnd,
 
     setUpMappingMode( hdc, cX, cY );
 
-    deleteTail( hdc, snkBdy, &oldTail );
-
-    drawNeck( hdc, snkBdy, snkHead );
+    deleteTail( hdc, snkBdy, &oldTail, gridPen, gridBrush );
 
     drawTail( hdc, snkBdy, tailPen, tailBrush );
+
+    drawNeck( hdc, snkBdy, snkHead );
 
     drawHead( hdc, collisionPt, snkBdy, snkHead, 
         headPenCol, headBrushCol, headPenNoCol, headBrushNoCol );
@@ -636,9 +644,12 @@ void moveSnake( HWND hwnd,
     ReleaseDC( hwnd, hdc );
 }
 
-void drawGrid( HDC hdc )
+void drawGrid( HDC hdc, HPEN gridPen, HBRUSH gridBrush )
 {
     int i;
+
+    SelectObject( hdc, gridPen );
+    SelectObject( hdc, gridBrush );
 
     for ( i = 0; i <= BRD_SIZE_SQ; i++ )
     {
@@ -728,7 +739,8 @@ void drawTail( HDC hdc, POINT *snkBdy, HPEN tailPen, HBRUSH tailBrush )
         snkBdy[ SNAKE_TAIL ].x + 1, snkBdy[ SNAKE_TAIL ].y + 1 );
 }
 
-void deleteTail( HDC hdc, POINT *snkBdy, POINT *oldTailPos )
+void deleteTail( HDC hdc, POINT *snkBdy, POINT *oldTailPos,
+    HPEN gridPen, HBRUSH gridBrush )
 {
     SelectObject( hdc, GetStockObject( WHITE_PEN ) );
     SelectObject( hdc, GetStockObject( WHITE_BRUSH ) );
@@ -738,7 +750,8 @@ void deleteTail( HDC hdc, POINT *snkBdy, POINT *oldTailPos )
         oldTailPos->x + 1, oldTailPos->y + 1 );
 
     // Re-draw old tail's square
-    SelectObject( hdc, GetStockObject( BLACK_PEN ) );
+    SelectObject( hdc, gridPen );
+    SelectObject( hdc, gridBrush );
     
     MoveToEx( hdc, oldTailPos->x + 1, oldTailPos->y    , NULL );
     LineTo  ( hdc, oldTailPos->x    , oldTailPos->y     );

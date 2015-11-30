@@ -1,0 +1,47 @@
+
+Snake ToDo List
+===============
+
+- Remaining time per apple / per level ?
+
+- More levels: boards, speeds, bouncing balls (see original game)
+
+- Grid color can be adjustable, but there should be a grid anyway?
+
+- Win / Game Over messages.
+
+- Help / How-To play / keyboard shortcuts.
+
+- HUD: lives, apples to go, time, level indicator, etc...
+
+- Sound.
+
+- Game controller input.
+
+- Multiplayer: local / remote / AI
+
+- Scoreboard.
+
+- Re-evaluate flow, rhythm.
+
+- Re-desing using OOP -> port to C++.
+
+- Port graphics to Direct2D.
+
+- Port documentation to Doxygen.
+
+- Evaluate / compare performance, cpu, and mem usage of different versions.
+
+- Deployment -> Installer.
+
+- Publishing / sharing.
+
+- Document requirements, verification and release process.
+
+================================================================================
+
+Bugs
+====
+
+- If grid color is different from black, as the tail is deleted,
+the neighbouring items (walls) are affected. (2015-11-30)
